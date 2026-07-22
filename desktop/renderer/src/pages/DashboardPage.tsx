@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import type { AppMode, LogEntry, SwipeProgress } from "../../../shared/types.js";
+import type { BrowserSessionStatus } from "../../../shared/ipc.js";
 import { BRAND } from "../constants/branding";
 import { PageShell } from "../components/PageShell";
 import { useSound } from "../context/SoundContext";
@@ -14,28 +15,47 @@ const MODES: Array<{ mode: AppMode; label: string; description: string }> = [
   { mode: "tinder-analisis", label: "Análisis", description: "Sync + informe AI" },
 ];
 
+const LOGIN_PLATFORMS: Array<{ id: keyof BrowserSessionStatus; label: string }> = [
+  { id: "tinder", label: "Tinder" },
+  { id: "bumble", label: "Bumble" },
+];
+
 export function DashboardPage() {
   const navigate = useNavigate();
   const { setLastResult } = useSessionResult();
   const { play } = useSound();
   const [selectedMode, setSelectedMode] = useState<AppMode>("tinder-swipe");
+  const [loginPlatform, setLoginPlatform] = useState<keyof BrowserSessionStatus>("tinder");
   const [running, setRunning] = useState(false);
+  const [loginRunning, setLoginRunning] = useState(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [progress, setProgress] = useState<SwipeProgress | null>(null);
   const [bootstrap, setBootstrap] = useState<{ chromium: boolean; ollama: boolean } | null>(null);
+  const [browserSessions, setBrowserSessions] = useState<BrowserSessionStatus | null>(null);
   const lastMatchesRef = useRef(0);
 
   const refreshBootstrap = () => {
     window.cupibot.checkBootstrap().then(setBootstrap);
   };
 
+  const refreshBrowserSessions = () => {
+    window.cupibot.getBrowserSessionStatus().then(setBrowserSessions);
+  };
+
   useEffect(() => {
     refreshBootstrap();
+    refreshBrowserSessions();
 
     const unsubscribe = window.cupibot.onBootstrapProgress((p) => {
       if (p.step === "complete") {
         refreshBootstrap();
       }
+    });
+
+    const unsubLoginComplete = window.cupibot.onBrowserLoginComplete(() => {
+      setLoginRunning(false);
+      refreshBrowserSessions();
+      play("success");
     });
 
     const unsubLog = window.cupibot.onLog((entry) => {
@@ -58,6 +78,7 @@ export function DashboardPage() {
 
     return () => {
       unsubscribe();
+      unsubLoginComplete();
       unsubLog();
       unsubProgress();
       unsubComplete();
@@ -65,12 +86,48 @@ export function DashboardPage() {
   }, [navigate, play, setLastResult]);
 
   const selectMode = (mode: AppMode) => {
-    if (running) {
+    if (running || loginRunning) {
       return;
     }
 
     setSelectedMode(mode);
     play("select");
+  };
+
+  const selectLoginPlatform = (platform: keyof BrowserSessionStatus) => {
+    if (running || loginRunning) {
+      return;
+    }
+
+    setLoginPlatform(platform);
+    play("select");
+  };
+
+  const startBrowserLogin = async () => {
+    setLogs([]);
+    setLoginRunning(true);
+    play("start");
+
+    try {
+      await window.cupibot.runBrowserLogin(loginPlatform);
+    } catch (error) {
+      setLoginRunning(false);
+      play("error");
+      setLogs((prev) => [
+        ...prev,
+        {
+          level: "error",
+          tag: BRAND.name,
+          message: error instanceof Error ? error.message : String(error),
+          ts: new Date(),
+        },
+      ]);
+    }
+  };
+
+  const finishBrowserLogin = () => {
+    play("stop");
+    window.cupibot.abortCupiBot();
   };
 
   const start = async () => {
@@ -109,10 +166,57 @@ export function DashboardPage() {
   return (
     <PageShell
       title="Ejecutar CupiBot"
-      subtitle="Elige un modo, inicia la sesión y sigue el progreso en tiempo real."
+      subtitle="Primero inicia sesión en Tinder o Bumble (solo una vez). Luego elige un modo y ejecuta."
       hero={BRAND.banner2}
       heroClassName="page-hero page-hero--center"
     >
+      <div className="card card-glow">
+        <h3>Iniciar sesión en Tinder / Bumble</h3>
+        <p className="login-help">
+          Solo necesitas hacerlo la primera vez. CupiBot abrirá Chromium para que inicies sesión
+          manualmente y guarde tu cuenta para las próximas ejecuciones.
+        </p>
+        <div className="status-row" style={{ marginBottom: 14 }}>
+          <span className={`status-pill ${browserSessions?.tinder ? "ok" : "bad"}`}>
+            <span className="status-dot" />
+            Tinder {browserSessions?.tinder ? "sesión guardada" : "sin sesión"}
+          </span>
+          <span className={`status-pill ${browserSessions?.bumble ? "ok" : "bad"}`}>
+            <span className="status-dot" />
+            Bumble {browserSessions?.bumble ? "sesión guardada" : "sin sesión"}
+          </span>
+        </div>
+        <div className="mode-grid login-platform-grid">
+          {LOGIN_PLATFORMS.map((item) => (
+            <div
+              key={item.id}
+              className={`mode-card ${loginPlatform === item.id ? "selected" : ""}`}
+              onClick={() => selectLoginPlatform(item.id)}
+            >
+              <strong>{item.label}</strong>
+              <p>Iniciar sesión aquí</p>
+            </div>
+          ))}
+        </div>
+        {loginRunning ? (
+          <p className="login-active-hint">
+            Inicia sesión en la ventana de Chromium. Cuando termines, pulsa <strong>Listo</strong>.
+          </p>
+        ) : null}
+        <div className="actions" style={{ marginTop: 14 }}>
+          <button
+            className="secondary"
+            onClick={startBrowserLogin}
+            disabled={running || loginRunning}
+          >
+            {loginRunning ? "Esperando login..." : "Iniciar sesión"}
+          </button>
+          <button onClick={finishBrowserLogin} disabled={!loginRunning}>
+            Listo
+          </button>
+        </div>
+      </div>
+
       <div className="card card-glow">
         <h3>Estado del sistema</h3>
         <div className="status-row">
@@ -142,8 +246,8 @@ export function DashboardPage() {
           ))}
         </div>
         <div className="actions" style={{ marginTop: 18 }}>
-          <button onClick={start} disabled={running}>
-            {running ? "Ejecutando..." : "Iniciar sesión"}
+          <button onClick={start} disabled={running || loginRunning}>
+            {running ? "Ejecutando..." : "Ejecutar"}
           </button>
           <button className="danger" onClick={stop} disabled={!running}>
             Detener

@@ -152,6 +152,11 @@ function registerIpcHandlers(): void {
   ipcMain.handle(IPC_CHANNELS.CUPIBOT_RUN, async (_event, mode) => {
     await cupibotService.run(mode);
   });
+  ipcMain.handle(IPC_CHANNELS.CUPIBOT_BROWSER_LOGIN, async (_event, platform) => {
+    await cupibotService.runBrowserLogin(platform);
+  });
+  ipcMain.handle(IPC_CHANNELS.CUPIBOT_BROWSER_SESSION_STATUS, () =>
+    cupibotService.getBrowserSessionStatus());
   ipcMain.handle(IPC_CHANNELS.CUPIBOT_ABORT, () => {
     cupibotService.abort();
   });

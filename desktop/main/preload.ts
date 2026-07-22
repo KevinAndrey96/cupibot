@@ -23,6 +23,9 @@ const api: CupiBotApi = {
   checkBootstrap: () => ipcRenderer.invoke(IPC_CHANNELS.BOOTSTRAP_CHECK),
   runBootstrap: () => ipcRenderer.invoke(IPC_CHANNELS.BOOTSTRAP_RUN),
   runCupiBot: (mode: AppMode) => ipcRenderer.invoke(IPC_CHANNELS.CUPIBOT_RUN, mode),
+  runBrowserLogin: (platform: "tinder" | "bumble") =>
+    ipcRenderer.invoke(IPC_CHANNELS.CUPIBOT_BROWSER_LOGIN, platform),
+  getBrowserSessionStatus: () => ipcRenderer.invoke(IPC_CHANNELS.CUPIBOT_BROWSER_SESSION_STATUS),
   abortCupiBot: () => ipcRenderer.invoke(IPC_CHANNELS.CUPIBOT_ABORT),
   onLog: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, entry: unknown) => {
@@ -66,6 +69,17 @@ const api: CupiBotApi = {
 
     return () => {
       ipcRenderer.removeListener(IPC_CHANNELS.CUPIBOT_COMPLETE, listener);
+    };
+  },
+  onBrowserLoginComplete: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, platform: unknown) => {
+      callback(platform as "tinder" | "bumble");
+    };
+
+    ipcRenderer.on(IPC_CHANNELS.CUPIBOT_BROWSER_LOGIN_COMPLETE, listener);
+
+    return () => {
+      ipcRenderer.removeListener(IPC_CHANNELS.CUPIBOT_BROWSER_LOGIN_COMPLETE, listener);
     };
   },
 };

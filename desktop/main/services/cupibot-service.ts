@@ -1,6 +1,8 @@
 import type { BrowserWindow } from "electron";
 import type { AppMode } from "../../shared/types.js";
-import { runCupiBot } from "../../../src/cupibot-runner.js";
+import type { Platform } from "../../../src/domain/types.js";
+import { runCupiBot, runBrowserLogin } from "../../../src/cupibot-runner.js";
+import { browserSessionExists } from "../../../src/infrastructure/persistence/session-storage.js";
 import { isChromiumInstalled } from "../../../src/infrastructure/bootstrap/playwright-bootstrap.js";
 import { locateOllamaBinary } from "../../../src/infrastructure/bootstrap/ollama-binary-locator.js";
 import { runDependencyBootstrap } from "../../../src/infrastructure/bootstrap/dependency-bootstrap.js";
@@ -51,6 +53,59 @@ export class CupiBotService {
 
   isRunning(): boolean {
     return this.running;
+  }
+
+  async getBrowserSessionStatus(): Promise<{ tinder: boolean; bumble: boolean }> {
+    return {
+      tinder: browserSessionExists("tinder"),
+      bumble: browserSessionExists("bumble"),
+    };
+  }
+
+  async runBrowserLogin(platform: Platform): Promise<void> {
+    if (this.running) {
+      throw new Error("cupibot is already running");
+    }
+
+    this.running = true;
+    this.abortController = new AbortController();
+    const window = this.getWindow();
+
+    const emitLog = (entry: LogEntry) => {
+      window?.webContents.send(IPC_CHANNELS.CUPIBOT_LOG, {
+        ...entry,
+        ts: entry.ts.toISOString(),
+      });
+    };
+
+    const emitBootstrapProgress = (progress: BootstrapProgress) => {
+      this.emitBootstrapProgress(progress);
+    };
+
+    try {
+      const result = await runBrowserLogin({
+        platform,
+        dataDir: getCupiBotDataDir(),
+        signal: this.abortController.signal,
+        onLog: emitLog,
+        onBootstrapProgress: emitBootstrapProgress,
+        skipBootstrap: this.bootstrapReady,
+      });
+
+      if (!result.ok && result.error) {
+        emitLog({
+          level: "error",
+          tag: "CupiBot",
+          message: result.error.message,
+          ts: new Date(),
+        });
+      }
+
+      window?.webContents.send(IPC_CHANNELS.CUPIBOT_BROWSER_LOGIN_COMPLETE, platform);
+    } finally {
+      this.running = false;
+      this.abortController = null;
+    }
   }
 
   async run(mode: AppMode): Promise<RunCupiBotResult> {

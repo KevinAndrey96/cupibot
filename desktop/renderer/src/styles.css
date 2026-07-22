@@ -784,6 +784,28 @@ td {
   }
 }
 
+.login-help {
+  margin: 0 0 14px;
+  color: var(--brand-text-muted);
+  line-height: 1.5;
+  font-size: 0.95rem;
+}
+
+.login-active-hint {
+  margin: 0 0 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(61, 156, 173, 0.12);
+  border: 1px solid var(--brand-border);
+  color: var(--brand-text);
+  line-height: 1.5;
+  font-size: 0.92rem;
+}
+
+.login-platform-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .actions {
   display: flex;
   gap: 10px;

@@ -33,6 +33,9 @@ export const IPC_CHANNELS = {
   BOOTSTRAP_RUN: "bootstrap:run",
   BOOTSTRAP_PROGRESS: "bootstrap:progress",
   CUPIBOT_RUN: "cupibot:run",
+  CUPIBOT_BROWSER_LOGIN: "cupibot:browserLogin",
+  CUPIBOT_BROWSER_SESSION_STATUS: "cupibot:browserSessionStatus",
+  CUPIBOT_BROWSER_LOGIN_COMPLETE: "cupibot:browserLoginComplete",
   CUPIBOT_ABORT: "cupibot:abort",
   CUPIBOT_GET_DATA_DIR: "cupibot:getDataDir",
   CUPIBOT_LOG: "cupibot:log",
@@ -68,6 +71,11 @@ export interface AnalysisReportData {
   metrics: unknown | null;
 }
 
+export interface BrowserSessionStatus {
+  tinder: boolean;
+  bumble: boolean;
+}
+
 export interface CupiBotApi {
   getDataDir(): Promise<string>;
   readEnv(): Promise<EnvVariable[]>;
@@ -87,11 +95,14 @@ export interface CupiBotApi {
   checkBootstrap(): Promise<BootstrapStatus>;
   runBootstrap(): Promise<void>;
   runCupiBot(mode: AppMode): Promise<void>;
+  runBrowserLogin(platform: "tinder" | "bumble"): Promise<void>;
+  getBrowserSessionStatus(): Promise<BrowserSessionStatus>;
   abortCupiBot(): Promise<void>;
   onLog(callback: (entry: LogEntry) => void): () => void;
   onProgress(callback: (progress: SwipeProgress) => void): () => void;
   onBootstrapProgress(callback: (progress: BootstrapProgress) => void): () => void;
   onComplete(callback: (result: RunCupiBotResult) => void): () => void;
+  onBrowserLoginComplete(callback: (platform: "tinder" | "bumble") => void): () => void;
 }
 
 declare global {
