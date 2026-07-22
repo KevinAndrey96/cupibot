@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Setup config from examples
+        run: npm run setup
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Typecheck desktop
+        run: npm run typecheck:desktop
+
+      - name: Test
+        run: npm test
+
+      - name: Coverage
+        run: npm run test:coverage
+
+  desktop:
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+            artifact: cupibot-mac
+          - os: windows-latest
+            platform: win
+            artifact: cupibot-win
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --legacy-peer-deps
+
+      - name: Setup config from examples
+        run: npm run setup
+
+      - name: Build desktop app
+        run: npm run desktop:build
+
+      - name: Package ${{ matrix.platform }} installer
+        run: npx electron-builder --${{ matrix.platform }} --config electron-builder.yml --publish never
+
+      - name: Upload ${{ matrix.artifact }}
+        uses: actions/upload-artifact@v5
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            release/*.dmg
+            release/*.exe
+          if-no-files-found: error
