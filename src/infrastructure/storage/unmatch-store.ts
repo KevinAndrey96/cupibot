@@ -3,13 +3,15 @@ import path from "node:path";
 import type { UnmatchEntry, UnmatchStorePort } from "../../domain/types.js";
 import { resolveDataPath } from "../../config/data-dir.js";
 
-const DEFAULT_FILE_PATH = resolveDataPath("context", "unmatches.json");
+function defaultFilePath(): string {
+  return resolveDataPath("context", "unmatches.json");
+}
 
 export class UnmatchStore implements UnmatchStorePort {
   private readonly filePath: string;
 
   constructor(filePath?: string) {
-    this.filePath = filePath ?? DEFAULT_FILE_PATH;
+    this.filePath = filePath ?? defaultFilePath();
     const dir = path.dirname(this.filePath);
 
     if (!fs.existsSync(dir)) {

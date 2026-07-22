@@ -3,13 +3,15 @@ import path from "node:path";
 import type { InstagramEntry, InstagramStorePort } from "../../domain/types.js";
 import { resolveDataPath } from "../../config/data-dir.js";
 
-const DEFAULT_FILE_PATH = resolveDataPath("context", "instagrams.json");
+function defaultFilePath(): string {
+  return resolveDataPath("context", "instagrams.json");
+}
 
 export class InstagramStore implements InstagramStorePort {
   private readonly filePath: string;
 
   constructor(filePath?: string) {
-    this.filePath = filePath ?? DEFAULT_FILE_PATH;
+    this.filePath = filePath ?? defaultFilePath();
     const dir = path.dirname(this.filePath);
 
     if (!fs.existsSync(dir)) {

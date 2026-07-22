@@ -1,6 +1,6 @@
 {
   "name": "cupibot",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "CupiBot - Tinder and Bumble automation with AI filtering and chat",
   "main": "./out/main/index.js",
   "scripts": {

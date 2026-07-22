@@ -1,11 +1,10 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import type { AppMode, LogEntry, SwipeProgress } from "../../../shared/types.js";
+import { useEffect, useState } from "react";
+import type { AppMode } from "../../../shared/types.js";
 import type { BrowserSessionStatus } from "../../../shared/ipc.js";
 import { BRAND } from "../constants/branding";
 import { PageShell } from "../components/PageShell";
 import { useSound } from "../context/SoundContext";
-import { useSessionResult } from "../context/SessionContext.js";
+import { useSession } from "../context/SessionContext.js";
 
 const MODES: Array<{ mode: AppMode; label: string; description: string }> = [
   { mode: "tinder-swipe", label: "Swipe Tinder", description: "Swipes con filtro AI" },
@@ -21,18 +20,24 @@ const LOGIN_PLATFORMS: Array<{ id: keyof BrowserSessionStatus; label: string }> 
 ];
 
 export function DashboardPage() {
-  const navigate = useNavigate();
-  const { setLastResult } = useSessionResult();
   const { play } = useSound();
-  const [selectedMode, setSelectedMode] = useState<AppMode>("tinder-swipe");
-  const [loginPlatform, setLoginPlatform] = useState<keyof BrowserSessionStatus>("tinder");
-  const [running, setRunning] = useState(false);
-  const [loginRunning, setLoginRunning] = useState(false);
-  const [logs, setLogs] = useState<LogEntry[]>([]);
-  const [progress, setProgress] = useState<SwipeProgress | null>(null);
+  const {
+    logs,
+    clearLogs,
+    appendLog,
+    running,
+    setRunning,
+    loginRunning,
+    setLoginRunning,
+    progress,
+    resetRunTracking,
+    selectedMode,
+    setSelectedMode,
+    loginPlatform,
+    setLoginPlatform,
+  } = useSession();
   const [bootstrap, setBootstrap] = useState<{ chromium: boolean; ollama: boolean } | null>(null);
   const [browserSessions, setBrowserSessions] = useState<BrowserSessionStatus | null>(null);
-  const lastMatchesRef = useRef(0);
 
   const refreshBootstrap = () => {
     window.cupibot.checkBootstrap().then(setBootstrap);
@@ -53,37 +58,14 @@ export function DashboardPage() {
     });
 
     const unsubLoginComplete = window.cupibot.onBrowserLoginComplete(() => {
-      setLoginRunning(false);
       refreshBrowserSessions();
-      play("success");
-    });
-
-    const unsubLog = window.cupibot.onLog((entry) => {
-      setLogs((prev) => [...prev.slice(-500), { ...entry, ts: new Date(entry.ts) }]);
-    });
-    const unsubProgress = window.cupibot.onProgress((value) => {
-      setProgress(value);
-
-      if (value.stats.matches > lastMatchesRef.current) {
-        lastMatchesRef.current = value.stats.matches;
-        play("notify");
-      }
-    });
-    const unsubComplete = window.cupibot.onComplete((result) => {
-      setRunning(false);
-      setLastResult(result);
-      play(result.ok ? "success" : "error");
-      navigate("/summary");
     });
 
     return () => {
       unsubscribe();
       unsubLoginComplete();
-      unsubLog();
-      unsubProgress();
-      unsubComplete();
     };
-  }, [navigate, play, setLastResult]);
+  }, []);
 
   const selectMode = (mode: AppMode) => {
     if (running || loginRunning) {
@@ -104,7 +86,7 @@ export function DashboardPage() {
   };
 
   const startBrowserLogin = async () => {
-    setLogs([]);
+    clearLogs();
     setLoginRunning(true);
     play("start");
 
@@ -113,15 +95,11 @@ export function DashboardPage() {
     } catch (error) {
       setLoginRunning(false);
       play("error");
-      setLogs((prev) => [
-        ...prev,
-        {
-          level: "error",
-          tag: BRAND.name,
-          message: error instanceof Error ? error.message : String(error),
-          ts: new Date(),
-        },
-      ]);
+      appendLog({
+        level: "error",
+        tag: BRAND.name,
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   };
 
@@ -131,9 +109,8 @@ export function DashboardPage() {
   };
 
   const start = async () => {
-    setLogs([]);
-    setProgress(null);
-    lastMatchesRef.current = 0;
+    clearLogs();
+    resetRunTracking();
     setRunning(true);
     play("start");
 
@@ -142,15 +119,11 @@ export function DashboardPage() {
     } catch (error) {
       setRunning(false);
       play("error");
-      setLogs((prev) => [
-        ...prev,
-        {
-          level: "error",
-          tag: BRAND.name,
-          message: error instanceof Error ? error.message : String(error),
-          ts: new Date(),
-        },
-      ]);
+      appendLog({
+        level: "error",
+        tag: BRAND.name,
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   };
 
