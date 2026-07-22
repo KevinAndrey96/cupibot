@@ -1,0 +1,122 @@
+name: Desktop Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: desktop-release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci --legacy-peer-deps
+      - run: npm run setup
+      - run: npm run typecheck
+      - run: npm run typecheck:desktop
+      - run: npm test
+
+  build:
+    needs: test
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            platform: mac
+            artifact: cupibot-mac
+          - os: windows-latest
+            platform: win
+            artifact: cupibot-win
+
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci --legacy-peer-deps
+      - run: npm run setup
+      - run: npm run desktop:build
+      - run: npx electron-builder --${{ matrix.platform }} --config electron-builder.yml --publish never
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            release/*.dmg
+            release/*.exe
+          if-no-files-found: error
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Download installers
+        uses: actions/download-artifact@v5
+        with:
+          path: release-artifacts
+          merge-multiple: true
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          mapfile -t FILES < <(find release-artifacts -type f \( -name '*.dmg' -o -name '*.exe' \) | sort)
+          if [ "${#FILES[@]}" -eq 0 ]; then
+            echo "no release files found"
+            exit 1
+          fi
+
+          echo "release files:"
+          printf '  - %s\n' "${FILES[@]}"
+
+          attempt=1
+          max_attempts=8
+          wait_seconds=90
+
+          while [ "$attempt" -le "$max_attempts" ]; do
+            echo "release attempt ${attempt}/${max_attempts}"
+
+            if gh release view "$TAG" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+              if gh release upload "$TAG" "${FILES[@]}" --clobber --repo "${{ github.repository }}"; then
+                echo "release assets uploaded"
+                exit 0
+              fi
+            elif gh release create "$TAG" "${FILES[@]}" \
+              --title "CupiBot ${TAG}" \
+              --generate-notes \
+              --repo "${{ github.repository }}"; then
+              echo "release created"
+              exit 0
+            fi
+
+            if [ "$attempt" -eq "$max_attempts" ]; then
+              echo "release failed after ${max_attempts} attempts"
+              exit 1
+            fi
+
+            echo "waiting ${wait_seconds}s before retry..."
+            sleep "$wait_seconds"
+            attempt=$((attempt + 1))
+          done
