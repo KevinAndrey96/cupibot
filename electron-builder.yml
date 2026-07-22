@@ -1,0 +1,42 @@
+appId: com.cupibot.desktop
+productName: CupiBot
+publish: null
+generateUpdatesFilesForAllChannels: false
+artifactName: CupiBot-${version}-${os}.${ext}
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**/*
+  - dist/**/*
+  - package.json
+  - node_modules/**/*
+extraResources:
+  - from: build/icon.png
+    to: build/icon.png
+  - from: config/ai
+    to: config/ai
+    filter:
+      - "**/*.example.json"
+  - from: .env.example
+    to: .env.example
+  - from: context/instagrams.example.json
+    to: context/instagrams.example.json
+mac:
+  target:
+    - dmg
+  category: public.app-category.utilities
+  icon: build/icon.png
+  # Ad-hoc sign on CI (no Apple Developer ID). Reduces Gatekeeper issues; users may still need README workaround.
+  identity: "-"
+  gatekeeperAssess: false
+dmg:
+  writeUpdateInfo: false
+win:
+  target:
+    - nsis
+  icon: build/icon.png
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  differentialPackage: false

@@ -1,0 +1,26 @@
+node_modules/
+dist/
+out/
+release/
+coverage/
+user-data/
+messages/
+
+# User-specific config (copy from .example.json via scripts/setup-config.sh)
+config/ai/*.json
+config/ai/*/*.json
+!config/ai/*.example.json
+!config/ai/*/*.example.json
+
+# Runtime context and personal data
+context/historical.json
+context/unmatches.json
+context/instagrams.json
+context/personal-info.yaml
+context/analysis-report.md
+context/analysis-metrics.json
+context/runtime-context.json
+.env
+*.log
+.DS_Store
+*~

@@ -1,0 +1,28 @@
+{
+  "entries": [
+    {
+      "question": "De dónde eres?",
+      "answer": "soy de [tu ciudad], [tu país]"
+    },
+    {
+      "question": "Cuántos años tienes?",
+      "answer": "tengo [tu edad]"
+    },
+    {
+      "question": "A qué te dedicas?",
+      "answer": "trabajo en [tu profesión]"
+    },
+    {
+      "question": "Qué te gusta hacer?",
+      "answer": "[tus hobbies principales]"
+    },
+    {
+      "question": "Tienes Instagram?",
+      "answer": "sí, @[tu_usuario], hablamos por ahí"
+    },
+    {
+      "question": "Qué buscas en la app?",
+      "answer": "conocer gente bacana y ver qué sale"
+    }
+  ]
+}
